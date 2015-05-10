@@ -1,4 +1,9 @@
-#
+# Create RVM files
+run "echo #{@app_name} > .ruby-gemset"
+run "echo `rvm current` > .ruby-version"
+run "rvm gemset create #{@app_name}"
+run "rvm gemset use #{@app_name}"
+
 # Application Setup
 # ==================================
 # Application generators configuration
@@ -6,10 +11,10 @@ inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
     # Generator configuration
     config.generators do |g|
       g.test_framework :rspec,
-        fixture: true,
+        fixture: false,
         view_specs: false,
         helper_specs: false,
-        routing_specs: true,
+        routing_specs: false,
         controller_specs: true,
         request_specs: true
       g.fixture_replacement :factory_girl, dir: "spec/factories"
@@ -30,6 +35,7 @@ run "cat << EOF >> .gitignore
 database.yml
 doc/
 *.swp
+*.swo
 *~
 .project
 .idea
@@ -61,7 +67,7 @@ end
 gem 'unicorn'
 
 # Postgres
-gem 'pg'
+#gem 'pg'
 
 # Styling
 gem 'foundation-rails'
@@ -80,9 +86,8 @@ inject_into_file "spec/spec_helper.rb", :after => "require 'rspec/autorun'" do
   "\nrequire 'capybara/rspec'"
 end
 
-# Create spec/features to place out feature spec.
+# Create spec/features to place our feature spec.
 run "mkdir spec/features"
-
 
 #
 # Foundation Setup
@@ -120,6 +125,20 @@ authorization do
   #end
 end"
 end
+
+inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
+  #
+  # Letting declarative authorization know who the current user is.
+  #
+  before_filter { |c| Authorization.current_user = c.current_user }
+
+
+  def permission_denied
+    redirect_to root_url
+  end
+RUBY
+end
+
 
 run "rake db:migrate"
 run "rake db:test:prepare"
