@@ -2,9 +2,46 @@
 run "echo #{@app_name} > .ruby-gemset"
 run "echo `rvm current` > .ruby-version"
 run "rvm gemset create #{@app_name}"
-run "rvm gemset use #{@app_name}"
+run "rvm `rvm current` do rvm gemset use #{@app_name}"
 
-# Application Setup
+# Gems
+# ===================================
+# Authentication
+gem 'devise'
+
+# Authorization
+gem 'declarative_authorization'
+
+gem_group :development, :test do
+  gem 'rspec-rails' # Testing framework for rails.
+  gem 'factory_girl_rails' # Replaces fixtures for feeding test data via factories.
+end
+
+gem_group :test do
+  gem 'faker' # Generates fake test data.
+  gem 'capybara'
+end
+
+# Use unicorn as the app server
+gem 'unicorn'
+
+# Postgres
+#gem 'pg'
+
+# Styling
+gem 'foundation-rails'
+
+# Misc
+gem 'twitter'
+
+gem 'jquery-ui-rails'
+inject_into_file "app/assets/javascripts/application.js", :after =>  "//= require jquery\n" do
+  "//= require jquery-ui\n"
+end
+
+
+#
+# Application Config
 # ==================================
 # Application generators configuration
 inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
@@ -47,48 +84,19 @@ git :init
 
 
 #
-# Gems
-# ===================================
-# Authentication
-gem 'devise'
-
-# Authorization
-gem 'declarative_authorization'
-
-gem_group :development, :test do
-  gem 'rspec-rails' # Testing framework for rails.
-  gem 'factory_girl_rails' # Replaces fixtures for feeding test data via factories.
-end
-
-gem_group :test do
-  gem 'faker' # Generates fake test data.
-  gem 'capybara'
-end
-
-# Use unicorn as the app server
-gem 'unicorn'
-
-# Postgres
-#gem 'pg'
-
-# Styling
-gem 'foundation-rails'
-
-# Install the gems
-run 'bundle install'
-
-#
 # Rspec Setup
 # ===================================
 generate "rspec:install"
 
 run "echo \"--format documentation\" >> .rspec"
 
+
 #
 # Foundation Setup
 # ===================================
 remove_file 'app/views/layouts/application.html.erb'
 generate "foundation:install"
+
 
 #
 # Base User Setup
@@ -127,6 +135,7 @@ inject_into_file "app/models/user.rb", :before => "end" do <<-'RUBY'
   end
 RUBY
 end
+
 
 #
 # Authentication Setup
@@ -192,10 +201,18 @@ run "rake db:create"
 run "rake db:migrate"
 run "rake db:test:prepare"
 
+
+#
+# Environment Stuff
+# ================================
+
+
 say <<-eos
 ============================================================================
 Your new Rails application is ready to go.
 Don't forget to scroll up for important messages from installed generators.
 
 No model spec has been written for the User model.
+
+Run `bundle install` to install dependencies.
 eos
