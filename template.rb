@@ -16,7 +16,7 @@ inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
         helper_specs: false,
         routing_specs: false,
         controller_specs: true,
-        request_specs: true
+        request_specs: false
       g.fixture_replacement :factory_girl, dir: "spec/factories"
     end
 RUBY
@@ -42,6 +42,8 @@ doc/
 .secret
 .DS_Store
 EOF"
+
+git :init
 
 
 #
@@ -82,13 +84,6 @@ generate "rspec:install"
 
 run "echo \"--format documentation\" >> .rspec"
 
-inject_into_file "spec/spec_helper.rb", :after => "require 'rspec/autorun'" do
-  "\nrequire 'capybara/rspec'"
-end
-
-# Create spec/features to place our feature spec.
-run "mkdir spec/features"
-
 #
 # Foundation Setup
 # ===================================
@@ -100,6 +95,39 @@ generate "foundation:install"
 # ===================================
 generate "scaffold User email:string first_name:string last_name:string password_digest:string session_token:string"
 
+inject_into_file "app/models/user.rb", :before => "end" do <<-'RUBY'
+  EMAIL_REGEXP = /\A[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+\z/
+
+
+  # Validations
+  validates :email,      presence: true, uniqueness: true,
+                         format: {
+                            with: EMAIL_REGEXP,
+                            message: "Invalid email address."
+                         }
+  validates :first_name,            presence: true
+  validates :last_name,             presence: true
+  validates :password,              presence: true,  length: { minimum: 6 }
+  validates :password_confirmation, presence: true
+
+  # Filters
+  before_save { |user| user.email = email.downcase }
+
+  # Relations
+  has_many :user_roles
+  has_many :roles, :through => :user_roles
+
+  # Methods
+  has_secure_password
+
+  def role_symbols
+    self.roles.map do |role|
+      role.name.underscore.to_sym
+    end
+  end
+RUBY
+end
+
 #
 # Authentication Setup
 # ===================================
@@ -107,6 +135,7 @@ generate "scaffold User email:string first_name:string last_name:string password
 
 #
 # Authorization Setup
+# ===================================
 create_file "config/authoriazation_rules.rb" do
   "#
 # Here we define the roles that each user could have.
@@ -114,6 +143,8 @@ create_file "config/authoriazation_rules.rb" do
 # We have a many to many relationship between users and roles.
 #
 authorization do
+  #role :guest do
+  #end
   #role :admin do
   #  has_permission_on [:adventures], :to => [:index, :show, :new, :create, :edit, :update, :destroy]
   #end
@@ -126,7 +157,25 @@ authorization do
 end"
 end
 
-inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
+create_file "app/models/user_role_maps.rb" do <<-'RUBY'
+class UserRole < ActiveRecord::Base
+  belongs_to :user
+  belongs_to :role
+end
+RUBY
+end
+
+create_file "app/models/role.rb" do <<-'RUBY'
+class Role < ActiveRecord::Base
+end
+RUBY
+end
+
+generate "migration CreateRoles name:string"
+generate "migration CreateJoinTableUserRole user role"
+
+inject_into_file "app/controllers/application_controller.rb", :before => "end" do <<-'RUBY'
+
   #
   # Letting declarative authorization know who the current user is.
   #
@@ -139,7 +188,7 @@ inject_into_file "config/application.rb", :before => "  end" do <<-'RUBY'
 RUBY
 end
 
-
+run "rake db:create"
 run "rake db:migrate"
 run "rake db:test:prepare"
 
